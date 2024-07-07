@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Wimm.Common">
+      <HintPath>dll\Wimm.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="Wimm.Machines">
+      <HintPath>dll\Wimm.Machines.dll</HintPath>
+    </Reference>
+    <Reference Include="Wimm.Machines.TpipForRasberryPi">
+      <HintPath>dll\Wimm.Machines.TpipForRasberryPi.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
