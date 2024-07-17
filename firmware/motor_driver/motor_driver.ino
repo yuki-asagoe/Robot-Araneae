@@ -109,6 +109,7 @@ class MotorDriver{
     MotorDriver(int pin_in1,int pin_in2,MotorStopper stopper);
   public:
     bool checkStopper();
+    void updateStopper();
     virtual void changeState(DrivingMode mode,unsigned int speed);
 };
 MotorDriver::MotorDriver(int pin_in1,int pin_in2,MotorStopper stopper){
@@ -130,6 +131,9 @@ bool MotorDriver::checkStopper(){
     return true;
   }
   return false;
+}
+void MotorDriver::updateStopper(){
+  this->stopper.update();
 }
 //----
 
@@ -307,10 +311,13 @@ void loop() {
   }
   if(timePassedFromStopperCheck>100){
     bool stopperWorking=false;
+    lastStopperTimeStamp=time;
     for(int i=0;i<1;i++){
+      d_drivers[i].updateStopper();
       stopperWorking|=d_drivers[i].checkStopper();
     }
     for(int i=0;i<3;i++){
+      a_drivers[i].updateStopper();
       stopperWorking|=a_drivers[i].checkStopper();
     }
     if(stopperWorking){
