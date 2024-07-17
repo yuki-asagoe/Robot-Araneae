@@ -1,29 +1,154 @@
 #include <Wire.h>
 #include "variables.h"
 
+const int PIN_LED1=2;
+const int PIN_LED2=4;
+
+const int INPUT_PINS_D[]={
+  8,7,13,14,15,16,17
+};
+const int INPUT_PINS_A[]={
+  A6,A7
+};
+
+// num : 0 ~ 8
+bool system_input_is_on(int num){
+  if(num<0||num>=9){
+    return false;
+  }
+  if(num<7){
+    return digitalRead(INPUT_PINS_D[num]) == HIGH;
+  }else{
+    return analogRead(INPUT_PINS_A[num-7]) > 384;
+  }
+}
+void system_setup_input(int num){
+  if(num<0||num>=9){
+    return;
+  }
+  if(num<7){
+    pinMode(INPUT_PINS_D[num],INPUT);
+  }else{
+    pinMode(INPUT_PINS_A[num-7],INPUT_PULLUP);
+  }
+}
+int system_get_input_pin(int num){
+  if(num<0||num>=9){
+    return -1;
+  }
+  if(num<7){
+    return INPUT_PINS_D[num];
+  }else{
+    return INPUT_PINS_A[num-7];
+  }
+}
+
+struct MotorLimitPin{
+  int input_pin_index;
+  LimitType type;
+};
+//ここを抽象にする元気はない
+class MotorStopper{
+  private:
+    int limits_length;
+    MotorLimitPin* limits;
+    bool allowed[4]={};
+  public:
+    MotorStopper();
+    MotorStopper(int motorID);
+    bool allow(DrivingMode mode); 
+    void update();
+};
+MotorStopper::MotorStopper(){
+  this->limits_length=0;
+  this->limits=NULL;
+}
+MotorStopper::MotorStopper(int motorID){
+  this->limits_length=0;
+  for(int i=0;i<9;i++){
+    if(MotorLimits[i].motorID==motorID && MotorLimits[i].type!=LimitType::None)this->limits_length++;
+  }
+  this->limits=(MotorLimitPin*)malloc(sizeof(MotorLimitPin)*limits_length);
+  int current;
+  for(int i=0;i<9;i++){
+    if(MotorLimits[i].motorID==motorID && MotorLimits[i].type!=LimitType::None){
+      MotorLimitPin pin={i,MotorLimits[i].type};
+      this->limits[current++]=pin;
+      system_setup_input(i);
+    }
+  }
+}
+bool MotorStopper::allow(DrivingMode mode){
+  switch(mode){
+    case DrivingMode::Stop:
+    case DrivingMode::Brake:
+      return true;
+    case DrivingMode::Drive:
+      return this->allowed[(int)LimitType::Drive] && this->allowed[(int)LimitType::All];
+    case DrivingMode::ReverseDrive:
+      return this->allowed[(int)LimitType::Reverse] && this->allowed[(int)LimitType::All];
+  }
+  return false;
+}
+void MotorStopper::update(){
+  for(int i=0;i<4;i++){
+    this->allowed[i]=true;
+  }
+  for(int i=0;i<this->limits_length;i++){
+    if(system_input_is_on(this->limits[i].input_pin_index)){
+      this->allowed[(int)(this->limits[i].type)]=false;
+    }
+  }
+}
+
 class MotorDriver{
   protected: 
     int pin_in1,pin_in2;
-    MotorDriver(int pin_in1,int pin_in2);
+    DrivingMode current_state;
+    MotorStopper stopper;
+    MotorDriver(int pin_in1,int pin_in2,MotorStopper stopper);
+  public:
+    bool checkStopper();
     virtual void changeState(DrivingMode mode,unsigned int speed);
 };
-MotorDriver::MotorDriver(int pin_in1,int pin_in2){
+MotorDriver::MotorDriver(int pin_in1,int pin_in2,MotorStopper stopper){
   pinMode(pin_in1,OUTPUT);
   pinMode(pin_in2,OUTPUT);
   this->pin_in1=pin_in1;
   this->pin_in2=pin_in2;
+  digitalWrite(pin_in1,LOW);
+  digitalWrite(pin_in2,LOW);
+  this->current_state=DrivingMode::Stop;
+  this->stopper=stopper;
 }
-void MotorDriver::changeState(DrivingMode mode,unsigned int speed){}
+void MotorDriver::changeState(DrivingMode mode,unsigned int speed){
+  this->current_state=mode;
+}
+bool MotorDriver::checkStopper(){
+  if(!(this->stopper.allow(this->current_state))){
+    this->changeState(DrivingMode::Stop,0);
+    return true;
+  }
+  return false;
+}
 //----
 
-class AnalogMotorDriver:MotorDriver{
+class AnalogMotorDriver:public MotorDriver{
   public:
-    AnalogMotorDriver(int pin_in1,int pin_in2);
+    AnalogMotorDriver(int pin_in1,int pin_in2,MotorStopper stopper);
     void changeState(DrivingMode mode,unsigned int speed);
 };
-AnalogMotorDriver::AnalogMotorDriver(int pin_in1,int pin_in2):MotorDriver(pin_in1,pin_in2){}
+AnalogMotorDriver::AnalogMotorDriver(int pin_in1,int pin_in2,MotorStopper stopper):MotorDriver(pin_in1,pin_in2,stopper){}
 
 void AnalogMotorDriver::changeState(DrivingMode mode,unsigned int speed){
+  if(!(this->stopper.allow(mode))){
+    // Stop
+    MotorDriver::changeState(DrivingMode::Stop,0);
+    digitalWrite(pin_in1,LOW);
+    digitalWrite(pin_in2,LOW);
+    return;
+  }
+  MotorDriver::changeState(mode,speed);
   switch(mode){
     case DrivingMode::Stop:
       digitalWrite(pin_in1,LOW);
@@ -46,14 +171,22 @@ void AnalogMotorDriver::changeState(DrivingMode mode,unsigned int speed){
 
 //----
 
-class DigitalMotorDriver:MotorDriver{
+class DigitalMotorDriver:public MotorDriver{
   public:
-    DigitalMotorDriver(int pin_in1,int pin_in2);
+    DigitalMotorDriver(int pin_in1,int pin_in2,MotorStopper stopper);
     void changeState(DrivingMode mode,unsigned int _);
 };
-DigitalMotorDriver::DigitalMotorDriver(int pin_in1,int pin_in2):MotorDriver(pin_in1,pin_in2){}
+DigitalMotorDriver::DigitalMotorDriver(int pin_in1,int pin_in2,MotorStopper stopper):MotorDriver(pin_in1,pin_in2,stopper){}
 
 void DigitalMotorDriver::changeState(DrivingMode mode,unsigned int _){
+  if(!(this->stopper.allow(mode))){
+    // Stop
+    MotorDriver::changeState(DrivingMode::Stop,0);
+    digitalWrite(pin_in1,LOW);
+    digitalWrite(pin_in2,LOW);
+    return;
+  }
+  MotorDriver::changeState(mode,_);
   switch(mode){
     case DrivingMode::Stop:
       digitalWrite(pin_in1,LOW);
@@ -77,14 +210,15 @@ void DigitalMotorDriver::changeState(DrivingMode mode,unsigned int _){
 //----
 
 DigitalMotorDriver d_drivers[]={
-  DigitalMotorDriver(0,1)
+  DigitalMotorDriver(0,1,MotorStopper(0))
 };
 AnalogMotorDriver a_drivers[]={
-  AnalogMotorDriver(5,3),
-  AnalogMotorDriver(6,9),
-  AnalogMotorDriver(10,11)
+  AnalogMotorDriver(5,3,MotorStopper(1)),
+  AnalogMotorDriver(6,9,MotorStopper(2)),
+  AnalogMotorDriver(10,11,MotorStopper(3))
 };
 unsigned long lastI2CTimeStamp=0;
+unsigned long lastStopperTimeStamp=0;
 
 void onI2CReceive(int length){
   lastI2CTimeStamp=millis();
@@ -153,6 +287,7 @@ void setup() {
   #elif
     Serial.println("DEBUG PRINT : OFF / Motor 0 is available");
   #endif
+
   Serial.println("Initialization Finished : Ready..>");
 
   #ifndef DEBUG_PRINT
@@ -163,12 +298,26 @@ void setup() {
 void loop() {
   long int time = millis();
   long int timePassedFromI2CReceived=lastI2CTimeStamp-time;
+  long int timePassedFromStopperCheck=lastStopperTimeStamp-time;
 
-  if(timePassedFromI2CReceived<500){
+  if(timePassedFromI2CReceived>500){
     digitalWrite(PIN_LED1,HIGH);
-    digitalWrite(PIN_LED2,HIGH);
   }else{
-    digitalWrite(PIN_LED1,HIGH);
+    digitalWrite(PIN_LED1,LOW);
     digitalWrite(PIN_LED2,HIGH);
+  }
+  if(timePassedFromStopperCheck>100){
+    bool stopperWorking=false;
+    for(int i=0;i<1;i++){
+      stopperWorking|=d_drivers[i].checkStopper();
+    }
+    for(int i=0;i<3;i++){
+      stopperWorking|=a_drivers[i].checkStopper();
+    }
+    if(stopperWorking){
+      digitalWrite(PIN_LED2,HIGH);
+    }else{
+      digitalWrite(PIN_LED2,LOW);
+    }
   }
 }
