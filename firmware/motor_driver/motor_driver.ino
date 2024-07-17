@@ -27,7 +27,7 @@ void system_setup_input(int num){
     return;
   }
   if(num<7){
-    pinMode(INPUT_PINS_D[num],INPUT);
+    pinMode(INPUT_PINS_D[num],INPUT_PULLUP);
   }else{
     pinMode(INPUT_PINS_A[num-7],INPUT_PULLUP);
   }
@@ -304,7 +304,6 @@ void loop() {
     digitalWrite(PIN_LED1,HIGH);
   }else{
     digitalWrite(PIN_LED1,LOW);
-    digitalWrite(PIN_LED2,HIGH);
   }
   if(timePassedFromStopperCheck>100){
     bool stopperWorking=false;
