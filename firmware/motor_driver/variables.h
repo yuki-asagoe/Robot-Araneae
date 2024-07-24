@@ -1,7 +1,7 @@
 // If define this, Motor 0 cannot be used because the D0, D1 pins are used for Serial Communication.
-#define DEBUG_PRINT
+//#define DEBUG_PRINT
 
-const int I2C_ADDRESS=55;
+const int I2C_ADDRESS=0x55;
 
 enum class DrivingMode{
   Stop,Brake,Drive,ReverseDrive,

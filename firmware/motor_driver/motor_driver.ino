@@ -113,8 +113,15 @@ class MotorDriver{
     virtual void changeState(DrivingMode mode,unsigned int speed);
 };
 MotorDriver::MotorDriver(int pin_in1,int pin_in2,MotorStopper stopper){
+  #ifdef DEBUG_PRINT
+  if(pin_in1!=0 && pin_in1!=1 && pin_in2!=0 && pin_in2!=1){
+    pinMode(pin_in1,OUTPUT);
+    pinMode(pin_in2,OUTPUT);
+  }
+  #else
   pinMode(pin_in1,OUTPUT);
   pinMode(pin_in2,OUTPUT);
+  #endif
   this->pin_in1=pin_in1;
   this->pin_in2=pin_in2;
   digitalWrite(pin_in1,LOW);
@@ -275,12 +282,14 @@ void onI2CRequest(void){
 }
 
 void setup() {
+  pinMode(PIN_LED1,OUTPUT);
+  pinMode(PIN_LED2,OUTPUT);
+  digitalWrite(PIN_LED1,HIGH);
+  digitalWrite(PIN_LED2,HIGH);
   Serial.begin(9600);
   Serial.println("- Araneae Motor Driver -");
   Serial.print("I2C Address:");
   Serial.println(I2C_ADDRESS,HEX);
-  pinMode(PIN_LED1,OUTPUT);
-  pinMode(PIN_LED2,OUTPUT);
 
   Wire.onReceive(onI2CReceive);
   Wire.onRequest(onI2CRequest);
@@ -288,23 +297,28 @@ void setup() {
 
   #ifdef DEBUG_PRINT
     Serial.println("DEBUG PRINT : ON / Motor 0 is diabled.");
-  #elif
+  #else
     Serial.println("DEBUG PRINT : OFF / Motor 0 is available");
   #endif
 
   Serial.println("Initialization Finished : Ready..>");
 
+  delay(1000);
+
   #ifndef DEBUG_PRINT
     Serial.end();
   #endif
+  
+  digitalWrite(PIN_LED1,LOW);
+  digitalWrite(PIN_LED2,LOW);
 }
 
 void loop() {
   long int time = millis();
-  long int timePassedFromI2CReceived=lastI2CTimeStamp-time;
-  long int timePassedFromStopperCheck=lastStopperTimeStamp-time;
-
-  if(timePassedFromI2CReceived>500){
+  long int timePassedFromI2CReceived=time-lastI2CTimeStamp;
+  long int timePassedFromStopperCheck=time-lastStopperTimeStamp;
+  
+  if(timePassedFromI2CReceived<500){
     digitalWrite(PIN_LED1,HIGH);
   }else{
     digitalWrite(PIN_LED1,LOW);
