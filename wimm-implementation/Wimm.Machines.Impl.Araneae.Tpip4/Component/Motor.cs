@@ -56,15 +56,15 @@ namespace Wimm.Machines.Impl.Araneae.Tpip4.Component
                 mode = MotorDriver.MotorMode.ReverseDrive;
             }
             speedModifier = Math.Clamp(speedModifier, 0, 1);
-            HostDriver.Enqueue(new MotorDriver.Message(MotorID,mode, (byte)(speedModifier * 255)));
+            HostDriver.AddMessage(new MotorDriver.Message(MotorID,mode, (byte)(speedModifier * 255)));
         }
         public void Brake()
         {
-            HostDriver.Enqueue(new MotorDriver.Message(MotorID, MotorDriver.MotorMode.Brake, 0));
+            HostDriver.AddMessage(new MotorDriver.Message(MotorID, MotorDriver.MotorMode.Brake, 0));
         }
         public void Stop()
         {
-            HostDriver.Enqueue(new MotorDriver.Message(MotorID, MotorDriver.MotorMode.Stop, 0));
+            HostDriver.AddMessage(new MotorDriver.Message(MotorID, MotorDriver.MotorMode.Stop, 0));
         }
 
         public override string ModuleName => "アレイニー モーター";

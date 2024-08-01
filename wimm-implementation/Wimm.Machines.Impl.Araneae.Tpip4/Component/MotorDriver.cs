@@ -10,19 +10,25 @@ namespace Wimm.Machines.Impl.Araneae.Tpip4.Component
     internal class MotorDriver(byte i2cAddress)
     {
         public byte I2CAddress { get; } = i2cAddress;
-        private Queue<Message> MessagesQueue { get; } = new Queue<Message>();
+        private Message?[] MessageBuffer { get; } = new Message?[4];
 
-        public void Enqueue(Message message) => MessagesQueue.Enqueue(message);
+        public void AddMessage(Message message)
+        {
+            if (message.MotorID < 0 || message.MotorID >= 4) { return; }
+            MessageBuffer[message.MotorID] = message;
+        }
         public void SendAll()
         {
             var messages = new LinkedList<byte>();
-            foreach(var m in MessagesQueue)
+            foreach(var m in MessageBuffer)
             {
-                foreach(var i in m.Construct())
-                {
-                    messages.AddLast(i);
-                }
+                if(m is Message message)
+                    foreach(var i in message.Construct())
+                    {
+                        messages.AddLast(i);
+                    }
             }
+            Array.Fill(MessageBuffer, null);
             var data = messages.ToArray();
             TPJT4.NativeMethods.Send_I2Cdata(0, data, I2CAddress, data.Length);
         }
