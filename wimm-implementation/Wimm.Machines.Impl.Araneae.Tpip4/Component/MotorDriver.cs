@@ -47,9 +47,10 @@ namespace Wimm.Machines.Impl.Araneae.Tpip4.Component
                 }
             }
         }
-        public enum MotorMode : byte
-        {
-            Stop=0,Brake,Drive,ReverseDrive
-        }
+        
+    }
+    public enum MotorMode : byte
+    {
+        Stop = 0, Brake, Drive, ReverseDrive
     }
 }
